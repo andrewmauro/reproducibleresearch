@@ -1,0 +1,178 @@
+---
+title: "Reproducible Research Project I"
+author: "Andrew Mauro"
+date: "May 31, 2017"
+output: html_document
+---
+
+1. Read and Process the Data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list =ls())
+library(dplyr)
+library(ggplot2)
+library(data.table) 
+
+activity <- fread("activity.csv")
+
+#format date column
+activity$date <- as.POSIXct(activity$date, format = "%Y-%m-%d")
+
+#data set is read and processed for our analysis.
+
+```
+
+2. Histogram of the total steps per day
+
+```{r}
+#I was unclear on what the question was asking for so I created two plots - one with the total steps for each day and a histogram of steps per day.
+
+#create table of dates where count of date corresponds to step count
+daily <- activity %>% group_by(date) %>% summarise(daily = sum(steps, na.rm = TRUE))
+
+dates <- unique(daily$date)
+
+df <- data.frame()
+
+for(i in dates){
+        vec <- rep(i, daily[daily$date == i, "daily"])
+        vec <- data.frame(vec)
+        df <- rbind(df, vec)
+}
+
+df$date <- as.POSIXct(df$vec, origin = "1970-01-01")
+
+ggplot(df, aes(x = factor(x = date))) +
+        geom_histogram(stat = "count") +
+        ggtitle("Count of Steps per Day") +
+        xlab("Date") +
+        ylab ("Steps")
+
+
+
+#frequency histogram of daily step counts counts
+
+ggplot(daily, aes(x = daily)) +
+        geom_histogram(bins = 10) +
+        ggtitle("Count of Steps per Day") +
+        xlab("Number of Steps") +
+        ylab ("Frequency")
+
+     
+```
+
+
+3. Mean and median number of steps taken each day
+
+```{r}
+#Produce table that summarizes mean and median steps per day
+daystat <- activity %>% group_by(date) %>% summarise(meanStep = mean(steps, na.rm = TRUE), medStep = median(steps, na.rm = TRUE))
+
+daystat
+
+#the median and mode number of steps per day is 0.
+
+```
+
+4. Time series plot of the average number of steps taken
+
+
+```{r}
+
+ggplot(daystat, aes(x = date, y = meanStep)) +
+        geom_line() +
+        ggtitle("Average Steps Over Measurement Period") +
+        xlab("Observation Day") +
+        ylab ("Average Steps")
+
+
+```
+
+
+5. The 5-minute interval that, on average, contains the maximum number of steps
+
+```{r}
+#Produce table that summarizes mean steps per interval arranged by mean steps
+interval <- activity %>% group_by(interval) %>% summarise(meanStep = mean(steps, na.rm = TRUE)) %>% arrange(desc(meanStep))
+
+interval
+#interval 83 - 206 steps on average.
+
+```
+
+6. Code to describe and show a strategy for imputing missing data
+
+Missing values will be imputed based on the average number of steps per interval, grouped by day of week
+
+```{r}
+#identify weekends and week days
+activity$weekday <- weekdays(activity$date)
+
+#create new column depicting average steps for each grouped weekday/interval combination
+activity <- activity %>% group_by(weekday, interval) %>% mutate(meanStep = round(mean(steps, na.rm = TRUE),0))
+
+#replace NAs with average steps for the respective grouped weekday/interval combination
+activity[is.na(activity$steps), "steps"] <- activity[is.na(activity$steps), "meanStep"]
+
+activity
+```
+
+7. Histogram of the total number of steps taken each day after missing values are imputed
+
+```{r}
+#I was unclear on what the question was asking for so I created two plots - one with the total steps for each day and a histogram of steps per day.
+
+#create table of dates where count of date corresponds to step count
+daily <- activity %>% group_by(date) %>% summarise(daily = sum(steps, na.rm = TRUE))
+
+dates <- unique(daily$date)
+
+df <- data.frame()
+
+for(i in dates){
+        vec <- rep(i, daily[daily$date == i, "daily"])
+        vec <- data.frame(vec)
+        df <- rbind(df, vec)
+}
+
+df$date <- as.POSIXct(df$vec, origin = "1970-01-01")
+
+ggplot(df, aes(x = factor(x = date))) +
+        geom_histogram(stat = "count") +
+        ggtitle("Count of Steps per Day") +
+        xlab("Date") +
+        ylab ("Steps")
+
+
+
+#frequency histogram of daily step counts counts
+
+ggplot(daily, aes(x = daily)) +
+        geom_histogram(bins = 10) +
+        ggtitle("Count of Steps per Day") +
+        xlab("Number of Steps") +
+        ylab ("Frequency")
+
+```
+
+8. Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+
+```{r}
+
+activity <- activity %>% 
+        mutate(wkndStatus = ifelse(weekday %in% c("Saturday", "sunday"),"Weekend", "Weekday" )) %>%
+        group_by(interval, wkndStatus) %>% 
+        mutate(intervalMean_gbWknd = mean(steps))
+
+ggplot(activity, aes(x = interval, y = intervalMean_gbWknd)) +
+        geom_bar(stat = "identity") +
+        facet_wrap(~wkndStatus) +
+        ggtitle("Mean Steps per Interval: Weekends vs. Weekdays") +
+        xlab("Interval") +
+        ylab ("Mean Steps")
+
+```
+
+
